@@ -61,7 +61,7 @@ func createCacheAndPopulate(metricsCount int, maxPointsPerMetric int) *Cache {
 	return cache
 }
 
-var gp *points.Points
+var gp points.Points
 
 func benchmarkStrategy(b *testing.B, strategy string) {
 	cache := createCacheAndPopulate(1000*1000, 100)
@@ -73,9 +73,9 @@ func benchmarkStrategy(b *testing.B, strategy string) {
 	for i := 0; i < b.N; i++ {
 		cache.updateQueue()
 		for {
-			p := cache.getNext()
+			p, exists := cache.getNext()
 			gp = p // assign to package level var to avoid compiler optimizing us out
-			if p == nil {
+			if !exists {
 				break
 			}
 		}

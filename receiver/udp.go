@@ -8,6 +8,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/lomik/go-carbon/cache"
 	"github.com/lomik/go-carbon/helper"
 	"github.com/lomik/go-carbon/points"
 
@@ -17,7 +18,7 @@ import (
 // UDP receive metrics from UDP socket
 type UDP struct {
 	helper.Stoppable
-	out                chan *points.Points
+	cache              *cache.Cache
 	metricsReceived    uint32
 	incompleteReceived uint32
 	errors             uint32
@@ -26,8 +27,10 @@ type UDP struct {
 }
 
 // NewUDP create new instance of UDP
-func NewUDP(out chan *points.Points) *UDP {
-	return &UDP{out: out}
+func NewUDP(cache *cache.Cache) *UDP {
+	return &UDP{
+		cache: cache,
+	}
 }
 
 type incompleteRecord struct {
@@ -193,7 +196,7 @@ func (rcv *UDP) receiveWorker(exit chan bool) {
 					logrus.Info(err)
 				} else {
 					atomic.AddUint32(&rcv.metricsReceived, 1)
-					rcv.out <- msg
+					rcv.cache.Add(msg)
 				}
 			}
 		}

@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/lomik/go-carbon/cache"
 	"github.com/lomik/go-carbon/helper"
 	"github.com/lomik/go-carbon/points"
 
@@ -18,7 +19,7 @@ import (
 // TCP receive metrics from TCP connections
 type TCP struct {
 	helper.Stoppable
-	out                  chan *points.Points
+	cache                *cache.Cache
 	maxPickleMessageSize uint32
 	metricsReceived      uint32
 	errors               uint32
@@ -28,17 +29,17 @@ type TCP struct {
 }
 
 // NewTCP create new instance of TCP
-func NewTCP(out chan *points.Points) *TCP {
+func NewTCP(cache *cache.Cache) *TCP {
 	return &TCP{
-		out:      out,
+		cache:    cache,
 		isPickle: false,
 	}
 }
 
 // NewPickle create new instance of TCP with pickle listener enabled
-func NewPickle(out chan *points.Points) *TCP {
+func NewPickle(cache *cache.Cache) *TCP {
 	return &TCP{
-		out:                  out,
+		cache:                cache,
 		isPickle:             true,
 		maxPickleMessageSize: 67108864, // 64 Mb
 	}
@@ -99,7 +100,7 @@ func (rcv *TCP) HandleConnection(conn net.Conn) {
 				logrus.Info(err)
 			} else {
 				atomic.AddUint32(&rcv.metricsReceived, 1)
-				rcv.out <- msg
+				rcv.cache.Add(msg)
 			}
 		}
 	}
@@ -178,7 +179,7 @@ func (rcv *TCP) handlePickle(conn net.Conn) {
 
 		for _, msg := range msgs {
 			atomic.AddUint32(&rcv.metricsReceived, uint32(len(msg.Data)))
-			rcv.out <- msg
+			rcv.cache.Add(msg)
 		}
 	}
 }
