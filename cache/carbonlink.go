@@ -9,10 +9,12 @@ import (
 	"math"
 	"net"
 	"strings"
+	"sync/atomic"
 	"time"
 
 	"github.com/Sirupsen/logrus"
 
+	"github.com/lomik/go-carbon/cache/cmap"
 	"github.com/lomik/go-carbon/helper"
 	"github.com/lomik/go-carbon/points"
 )
@@ -162,29 +164,24 @@ func ReadCarbonlinkRequest(reader io.Reader) ([]byte, error) {
 // CarbonlinkListener receive cache Carbonlinkrequests from graphite-web
 type CarbonlinkListener struct {
 	helper.Stoppable
-	queryChan    chan *Query
-	readTimeout  time.Duration
-	queryTimeout time.Duration
-	tcpListener  *net.TCPListener
+	pointsMap   *cmap.ConcurrentMap
+	queryCnt    *uint32
+	readTimeout time.Duration
+	tcpListener *net.TCPListener
 }
 
 // NewCarbonlinkListener create new instance of CarbonlinkListener
-func NewCarbonlinkListener(queryChan chan *Query) *CarbonlinkListener {
+func NewCarbonlinkListener(c *Cache) *CarbonlinkListener {
 	return &CarbonlinkListener{
-		queryChan:    queryChan,
-		readTimeout:  30 * time.Second,
-		queryTimeout: 100 * time.Millisecond,
+		pointsMap:   &c.data,
+		queryCnt:    &c.cacheStats.queryCnt,
+		readTimeout: 30 * time.Second,
 	}
 }
 
 // SetReadTimeout for read request from client
 func (listener *CarbonlinkListener) SetReadTimeout(timeout time.Duration) {
 	listener.readTimeout = timeout
-}
-
-// SetQueryTimeout for queries to cache
-func (listener *CarbonlinkListener) SetQueryTimeout(timeout time.Duration) {
-	listener.queryTimeout = timeout
 }
 
 func pickleWriteMemo(b *bytes.Buffer, memo *uint32) {
@@ -216,26 +213,20 @@ func picklePoint(b *bytes.Buffer, p points.Point) {
 	b.WriteByte('\x86') // assemble 2 element tuple
 }
 
-func packReply(query *Query) []byte {
-
+func packReply(p *points.Points) []byte {
 	numPoints := 0
-
-	if query != nil && query.CacheData != nil {
-		numPoints = len(query.CacheData.Data)
-	}
-
 	buf := bytes.NewBuffer([]byte("\x00\x00\x00\x00\x80\x02}U\ndatapoints]"))
 
-	if numPoints > 1 {
-		buf.WriteByte('(')
-	}
-
-	if query != nil && query.CacheData != nil {
-		query.CacheData.Lock()
-		for _, item := range query.CacheData.Data {
+	if p != nil {
+		p.Lock()
+		numPoints = len(p.Data)
+		if numPoints > 1 {
+			buf.WriteByte('(')
+		}
+		for _, item := range p.Data {
 			picklePoint(buf, item)
 		}
-		query.CacheData.Unlock()
+		p.Unlock()
 	}
 
 	if numPoints == 0 {
@@ -280,18 +271,10 @@ func (listener *CarbonlinkListener) HandleConnection(conn net.Conn) {
 			}
 
 			if req.Type == "cache-query" {
-				query := NewQuery(req.Metric)
-				listener.queryChan <- query
+				atomic.AddUint32(listener.queryCnt, 1)
+				p, _ := listener.pointsMap.Get(req.Metric)
+				packed := packReply(p)
 
-				select {
-				case <-query.Wait:
-					// pass
-				case <-time.After(listener.queryTimeout):
-					logrus.Infof("[carbonlink] Cache no reply (%s timeout)", listener.queryTimeout)
-					query = nil // empty reply
-				}
-
-				packed := packReply(query)
 				if packed == nil {
 					break
 				}
