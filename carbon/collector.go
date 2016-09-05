@@ -107,6 +107,7 @@ func sendMetricFactory(endpoint *url.URL) (statCb, func()) {
 			return
 		}
 		_, err := conn.Write(chunkBuf.Bytes())
+		chunkBuf.Reset()
 		if err != nil {
 			logrus.Errorf("[stat] conn.Write failed: %s", err.Error())
 			conn.Close()
