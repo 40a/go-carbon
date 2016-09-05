@@ -118,7 +118,7 @@ func sendMetricFactory(endpoint *url.URL) (statCb, func()) {
 		return func(metric string, value float64) {
 			s := fmt.Sprintf("%s %v %v\n", metric, value, time.Now().UTC().Second())
 
-			if chunkBuf.Len()+len(s) > chunkBuf.Cap() {
+			if chunkBuf.Len()+len(s) > chunkSize {
 				flush()
 			}
 			chunkBuf.WriteString(s)
