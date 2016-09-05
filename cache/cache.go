@@ -119,14 +119,15 @@ func (c *Cache) SetMaxSize(maxSize uint32) {
 }
 
 // Sets number of persisters cache should distribute write jobs to
-func (c *Cache) SetNumPersisters(numPersisters int) {
+func (c *Cache) SetNumPersisters(numPersisters int) (err error) {
 	if c.dispatchChan != nil {
 		// TODO: need to check all invariants and allow clean resize, or dont bother
 		//       and just go with stupidly high number like 256
-		errors.New("Dynamic change of number of persisters is not supported yet (can cause batches to be lost)")
+		return errors.New("Dynamic change of number of persisters is not supported yet (can cause batches to be lost)")
 	}
 	c.dispatchChan = make(chan []*points.Points, numPersisters)
 	c.numPersisters = numPersisters
+	return nil
 }
 
 // Size returns size
