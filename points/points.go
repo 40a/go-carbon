@@ -32,9 +32,9 @@ type SinglePoint struct {
 	Point  Point
 }
 
-func (p *SinglePoint) WriteTo(w io.Writer) (err error) {
-	_, err = w.Write([]byte(fmt.Sprintf("%s %v %v\n", p.Metric, p.Point.Value, p.Point.Timestamp)))
-	return err
+func (p *SinglePoint) WriteTo(w io.Writer) (n int64, err error) {
+	c, err := w.Write([]byte(fmt.Sprintf("%s %v %v\n", p.Metric, p.Point.Value, p.Point.Timestamp)))
+	return int64(c), err
 }
 
 // New creates new instance of Points
@@ -184,14 +184,16 @@ func (p *Points) Append(onePoint Point) *Points {
 	return p
 }
 
-func (p *Points) WriteTo(w io.Writer) (err error) {
+func (p *Points) WriteTo(w io.Writer) (n int64, err error) {
+	var c int
 	for _, d := range p.Data { // every metric point
-		_, err = w.Write([]byte(fmt.Sprintf("%s %v %v\n", p.Metric, d.Value, d.Timestamp)))
+		c, err = w.Write([]byte(fmt.Sprintf("%s %v %v\n", p.Metric, d.Value, d.Timestamp)))
+		n += int64(c)
 		if err != nil {
-			return err
+			return n, err
 		}
 	}
-	return nil
+	return n, err
 }
 
 // Append *Points (concatination)
