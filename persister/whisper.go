@@ -31,7 +31,6 @@ type Whisper struct {
 	mockStore           func() (StoreFunc, func())
 	dispatchChan        <-chan []*points.Points
 	q                   *cache.WriteoutQueue
-	limiter             helper.Ratelimiter
 }
 
 // NewWhisper create instance of Whisper
@@ -44,7 +43,6 @@ func NewWhisper(rootPath string, schemas WhisperSchemas, aggregation *WhisperAgg
 		maxUpdatesPerSecond: 0,
 		dispatchChan:        dispatchChan,
 		q:                   q,
-		limiter:             helper.NewRatelimiter(),
 	}
 }
 
@@ -140,8 +138,16 @@ func (p *Whisper) worker(exit chan bool) {
 		storeFunc, batchDoneCb = p.mockStore()
 	}
 
+	limiter := helper.NewRatelimiter()
+	var rps int = 0
+	if p.maxUpdatesPerSecond > 0 {
+		rps = p.maxUpdatesPerSecond/p.workersCount + 1
+	}
+
 	processCallback := func(key string, values []*whisper.TimeSeriesPoint) error {
-		p.limiter.TickSleep(p.maxUpdatesPerSecond)
+		if rps != 0 {
+			limiter.TickSleep(rps)
+		}
 		return storeFunc(p, key, values)
 	}
 LOOP:
