@@ -23,7 +23,7 @@ type shard struct {
 func New() ConcurrentMap {
 	m := make(ConcurrentMap, SHARD_COUNT)
 	for i := 0; i < SHARD_COUNT; i++ {
-		m[i] = shard{items: make(map[string]*points.Points)}
+		m[i].items = make(map[string]*points.Points)
 	}
 	return m
 }
