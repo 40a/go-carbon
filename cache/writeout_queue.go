@@ -109,11 +109,6 @@ func (q *WriteoutQueue) update_cache_stats(_, pointsCount int) {
 	atomic.AddUint32(&q.cacheStats.sizeShared, -uint32(pointsCount))
 }
 
-// persisters register this callback to do point processing
-// point is passed in locked state, callback MUST unlock it upon return even if error is returned,
-// but preferrably it should unlock it ASAP, before entering potentially lengthy IO
-type QueueProcessCb func(p *points.Points) error
-
 // deletes elements from map if it is empty
 func deleteIfEmptyCb(exists bool, valueInMap *points.Points, _ *points.Points) (*points.Points, bool) {
 	// Shard lock always held by Upsert() which calls this function as a callback
@@ -159,11 +154,11 @@ func deleteIfEmptyCb(exists bool, valueInMap *points.Points, _ *points.Points) (
 }
 
 // Processes `count` elements from queue to start processing
-// it ensured all the correct locking, so that QueueProcessCb doesn't
+// it ensured all the correct locking, so that PersistPointFunc doesn't
 // need any of it
 //
 // returns how many metrcs were processed
-func (q *WriteoutQueue) Process(batch []*points.Points, fn QueueProcessCb) (metricsCount int) {
+func (q *WriteoutQueue) Process(batch []*points.Points, fn points.PersistPointFunc) (metricsCount int) {
 	metricsCount = len(batch)
 	pointsCount := 0
 

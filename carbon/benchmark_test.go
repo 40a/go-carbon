@@ -112,7 +112,7 @@ func startReceivers(b *testing.B, r *receiver.TCP, metrics []string, numConnecti
 }
 
 func startPersisters(t *testing.B, cache *cache.Cache, numPersisters int, exitChan chan struct{}) (p *persister.Whisper, countReport chan int) {
-	p = persister.NewWhisper("", nil, nil, cache.Out(), cache.WriteoutQueue())
+	p = persister.NewWhisper("", nil, nil, cache.Out(), cache.WriteoutQueue().Process)
 	p.SetWorkers(numPersisters)
 
 	countReport = make(chan int)

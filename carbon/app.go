@@ -200,7 +200,7 @@ func (app *App) startPersister(c *cache.Cache) {
 			app.Config.Whisper.Schemas,
 			app.Config.Whisper.Aggregation,
 			c.Out(),
-			c.WriteoutQueue(),
+			c.WriteoutQueue().Process,
 		)
 		p.SetMaxUpdatesPerSecond(app.Config.Whisper.MaxUpdatesPerSecond)
 		p.SetSparse(app.Config.Whisper.Sparse)

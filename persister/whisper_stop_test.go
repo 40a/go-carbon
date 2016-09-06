@@ -22,7 +22,7 @@ func TestGracefullyStop(t *testing.T) {
 			cache := cache.New()
 			cache.SetNumPersisters(workers)
 			assert.NoError(cache.Start()) // to read from cache.queue.writeoutComplete
-			p := NewWhisper(root, nil, nil, cache.Out(), cache.WriteoutQueue())
+			p := NewWhisper(root, nil, nil, cache.Out(), cache.WriteoutQueue().Process)
 			p.SetMaxUpdatesPerSecond(maxUpdatesPerSecond)
 			p.SetWorkers(workers)
 
@@ -75,7 +75,7 @@ func TestStopEmptyThrottledPersister(t *testing.T) {
 				cache := cache.New()
 				cache.SetNumPersisters(workers)
 				assert.NoError(cache.Start()) // to read from writeout complete channel
-				p := NewWhisper(root, nil, nil, cache.Out(), cache.WriteoutQueue())
+				p := NewWhisper(root, nil, nil, cache.Out(), cache.WriteoutQueue().Process)
 				p.SetMaxUpdatesPerSecond(maxUpdatesPerSecond)
 				p.SetWorkers(workers)
 

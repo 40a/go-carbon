@@ -14,6 +14,14 @@ import (
 	"github.com/hydrogen18/stalecucumber"
 )
 
+// persisters register this callback to do point processing
+// point is passed in locked state, callback MUST unlock it upon return even if error is returned,
+// but preferrably it should unlock it ASAP, before entering potentially lengthy IO
+type PersistPointFunc func(*Points) error
+
+// Type of callback which all persisters must call to process received batch of points
+type BatchProcessFunc func([]*Points, PersistPointFunc) (metricCount int)
+
 // Point value/time pair
 type Point struct {
 	Timestamp int

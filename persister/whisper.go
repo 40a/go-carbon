@@ -10,7 +10,6 @@ import (
 	"github.com/Sirupsen/logrus"
 	"github.com/lomik/go-whisper"
 
-	"github.com/lomik/go-carbon/cache"
 	"github.com/lomik/go-carbon/helper"
 	"github.com/lomik/go-carbon/points"
 )
@@ -31,11 +30,11 @@ type Whisper struct {
 	maxUpdatesPerSecond int
 	mockStore           func() (StoreFunc, func())
 	dispatchChan        <-chan []*points.Points
-	q                   *cache.WriteoutQueue
+	process             points.BatchProcessFunc
 }
 
 // NewWhisper create instance of Whisper
-func NewWhisper(rootPath string, schemas WhisperSchemas, aggregation *WhisperAggregation, dispatchChan <-chan []*points.Points, q *cache.WriteoutQueue) *Whisper {
+func NewWhisper(rootPath string, schemas WhisperSchemas, aggregation *WhisperAggregation, dispatchChan <-chan []*points.Points, process points.BatchProcessFunc) *Whisper {
 	return &Whisper{
 		schemas:             schemas,
 		aggregation:         aggregation,
@@ -43,7 +42,7 @@ func NewWhisper(rootPath string, schemas WhisperSchemas, aggregation *WhisperAgg
 		rootPath:            rootPath,
 		maxUpdatesPerSecond: 0,
 		dispatchChan:        dispatchChan,
-		q:                   q,
+		process:             process,
 	}
 }
 
@@ -165,7 +164,7 @@ LOOP:
 	for {
 		select {
 		case batch := <-p.dispatchChan:
-			p.q.Process(batch, processCallback)
+			p.process(batch, processCallback)
 			if batchDoneCb != nil {
 				batchDoneCb()
 			}
