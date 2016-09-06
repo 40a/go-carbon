@@ -3,11 +3,9 @@ package cache
 import (
 	"github.com/lomik/go-carbon/cache/cmap"
 	"github.com/lomik/go-carbon/points"
-	"github.com/lomik/go-whisper"
 	"sort"
 	"sync/atomic"
 	"time"
-	"unsafe"
 	//"github.com/Sirupsen/logrus"
 )
 
@@ -111,7 +109,10 @@ func (q *WriteoutQueue) update_cache_stats(_, pointsCount int) {
 	atomic.AddUint32(&q.cacheStats.sizeShared, -uint32(pointsCount))
 }
 
-type QueueProcessCb func(key string, p []*whisper.TimeSeriesPoint) error
+// persisters register this callback to do point processing
+// point is passed in locked state, callback MUST unlock it upon return even if error is returned,
+// but preferrably it should unlock it ASAP, before entering potentially lengthy IO
+type QueueProcessCb func(p *points.Points) error
 
 // deletes elements from map if it is empty
 func deleteIfEmptyCb(exists bool, valueInMap *points.Points, _ *points.Points) (*points.Points, bool) {
@@ -254,16 +255,9 @@ BATCH_LOOP:
 			}
 		}
 
-		// under lock copy all the points we are going to writeout
-		whisperPoints := make([]*whisper.TimeSeriesPoint, numPoints)
-
-		for i := 0; i < numPoints; i++ {
-			whisperPoints[i] = (*whisper.TimeSeriesPoint)(unsafe.Pointer(&p.Data[i]))
-			//whisperPoints[i] = &whisper.TimeSeriesPoint{Value: p.Data[i].Value, Time: p.Data[i].Timestamp}
-		}
-		p.Unlock()
-
-		if err := fn(p.Metric, whisperPoints); err == nil {
+		// pass `p` in locked state
+		if err := fn(p); err == nil {
+			// fn() unlocks `p` upon return
 			// no errors when commiting points, removing written
 			// datapoints and shifting tail to beginning
 			// NOTE: this is the only place where `p` is modified without shard.Lock held

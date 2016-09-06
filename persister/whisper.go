@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync/atomic"
+	"unsafe"
 
 	"github.com/Sirupsen/logrus"
 	"github.com/lomik/go-whisper"
@@ -144,11 +145,21 @@ func (p *Whisper) worker(exit chan bool) {
 		rps = p.maxUpdatesPerSecond/p.workersCount + 1
 	}
 
-	processCallback := func(key string, values []*whisper.TimeSeriesPoint) error {
+	processCallback := func(v *points.Points) error {
+		// v is passed locked
+		// under lock copy all the points we are going to writeout
+		numPoints := len(v.Data)
+		whisperPoints := make([]*whisper.TimeSeriesPoint, numPoints)
+
+		for i := 0; i < numPoints; i++ {
+			whisperPoints[i] = (*whisper.TimeSeriesPoint)(unsafe.Pointer(&v.Data[i]))
+		}
+		v.Unlock()
+
 		if rps != 0 {
 			limiter.TickSleep(rps)
 		}
-		return storeFunc(p, key, values)
+		return storeFunc(p, v.Metric, whisperPoints)
 	}
 LOOP:
 	for {
